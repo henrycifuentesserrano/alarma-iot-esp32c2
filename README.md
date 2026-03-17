@@ -128,13 +128,14 @@ El `74880` es la velocidad correcta para el cristal de 26MHz del ESPC2-12.
 
 ## Funcionamiento
 
-| Evento | LED GPIO10 | LED GPIO18 | Relé |
-|--------|-----------|-----------|------|
-| Arranca | OFF | OFF | OFF |
-| Conectado a WiFi/Blynk | OFF | ON | OFF |
-| Botón ON en app | ON | ON | ON |
-| Botón OFF en app | OFF | ON | OFF |
-| Sin conexión | OFF | OFF | último estado |
+## Máquina de estados
+
+| Estado | Descripción | LED GPIO18 | LED GPIO10 | Relé |
+|--------|-------------|-----------|-----------|------|
+| INICIANDO | Arrancando, conectando WiFi | Parpadea lento (500ms) | OFF | OFF |
+| CONECTANDO_BLYNK | WiFi OK, conectando a Blynk | Parpadea rápido (250ms) | OFF | OFF |
+| OPERANDO | Todo conectado, listo | ON fijo | según relé | según app |
+| RECONECTANDO | WiFi o Blynk caído | Parpadea lento (1000ms) | OFF | OFF |
 
 ---
 
