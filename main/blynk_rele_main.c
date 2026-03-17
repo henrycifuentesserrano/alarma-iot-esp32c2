@@ -12,11 +12,14 @@
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
 
-#define WIFI_SSID      CONFIG_WIFI_SSID
-#define WIFI_PASS      CONFIG_WIFI_PASSWORD
-#define BLYNK_AUTH     CONFIG_BLYNK_AUTH_TOKEN
-#define PIN_RELE       GPIO_NUM_5
-#define BLYNK_TEMPLATE_ID  CONFIG_BLYNK_TEMPLATE_ID
+#define WIFI_SSID         CONFIG_WIFI_SSID
+#define WIFI_PASS         CONFIG_WIFI_PASSWORD
+#define BLYNK_AUTH        CONFIG_BLYNK_AUTH_TOKEN
+#define BLYNK_TEMPLATE_ID CONFIG_BLYNK_TEMPLATE_ID
+
+#define PIN_RELE     GPIO_NUM_5
+#define LED_RELE     GPIO_NUM_10
+#define LED_WIFI     GPIO_NUM_18
 
 static const char *TAG = "blynk-rele";
 static EventGroupHandle_t wifi_event_group;
@@ -24,12 +27,20 @@ static EventGroupHandle_t wifi_event_group;
 
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 
+static void set_rele(int state)
+{
+    gpio_set_level(PIN_RELE, state);
+    gpio_set_level(LED_RELE, state);
+    ESP_LOGI(TAG, "Rele %s", state ? "ON" : "OFF");
+}
+
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
         esp_wifi_connect();
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        gpio_set_level(LED_WIFI, 0);
         ESP_LOGI(TAG, "Reconectando WiFi...");
         esp_wifi_connect();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -71,39 +82,36 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     esp_mqtt_event_handle_t event = event_data;
 
     switch (event_id) {
-        
-	case MQTT_EVENT_CONNECTED:
-    	    ESP_LOGI(TAG, "Conectado a Blynk MQTT!");
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(TAG, "Conectado a Blynk MQTT!");
+            gpio_set_level(LED_WIFI, 1);
             esp_mqtt_client_subscribe(mqtt_client, "downlink/#", 1);
             esp_mqtt_client_publish(mqtt_client, "info/mcu", "{\"tmpl\":\"" BLYNK_TEMPLATE_ID "\",\"ver\":\"0.1.0\",\"build\":\"Jan 1 2025\"}", 0, 0, 0);
             break;
 
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGW(TAG, "Desconectado de Blynk MQTT");
+            gpio_set_level(LED_WIFI, 0);
             break;
 
         case MQTT_EVENT_DATA:
-    	    ESP_LOGI(TAG, "Topic: %.*s", event->topic_len, event->topic);
+            ESP_LOGI(TAG, "Topic: %.*s", event->topic_len, event->topic);
             ESP_LOGI(TAG, "Data: %.*s", event->data_len, event->data);
 
-            // Manejar redirect
             if (event->topic_len > 0 && strncmp(event->topic, "downlink/redirect", 17) == 0) {
                 ESP_LOGW(TAG, "Blynk redirige a: %.*s", event->data_len, event->data);
             }
 
-            // Manejar V0
-    	    if (event->topic_len > 0 && strncmp(event->topic, "downlink/ds/Rele", 16) == 0) {
-        	char data[16] = {0};
-        	memcpy(data, event->data, event->data_len < 15 ? event->data_len : 15);
-        	if (strcmp(data, "1") == 0) {
-            	    gpio_set_level(PIN_RELE, 1);
-                    ESP_LOGI(TAG, "Rele ON");
+            if (event->topic_len > 0 && strncmp(event->topic, "downlink/ds/Rele", 16) == 0) {
+                char data[16] = {0};
+                memcpy(data, event->data, event->data_len < 15 ? event->data_len : 15);
+                if (strcmp(data, "1") == 0) {
+                    set_rele(1);
                 } else if (strcmp(data, "0") == 0) {
-                    gpio_set_level(PIN_RELE, 0);
-                    ESP_LOGI(TAG, "Rele OFF");
+                    set_rele(0);
                 }
             }
-    	    break;
+            break;
 
         case MQTT_EVENT_ERROR:
             ESP_LOGE(TAG, "Error MQTT");
@@ -147,7 +155,7 @@ void app_main(void)
     nvs_flash_init();
 
     gpio_config_t io_conf = {
-        .pin_bit_mask = (1ULL << PIN_RELE),
+        .pin_bit_mask = (1ULL << PIN_RELE) | (1ULL << LED_RELE) | (1ULL << LED_WIFI),
         .mode = GPIO_MODE_OUTPUT,
         .pull_up_en = GPIO_PULLUP_DISABLE,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
@@ -155,6 +163,8 @@ void app_main(void)
     };
     gpio_config(&io_conf);
     gpio_set_level(PIN_RELE, 0);
+    gpio_set_level(LED_RELE, 0);
+    gpio_set_level(LED_WIFI, 0);
 
     wifi_init();
     mqtt_init();
