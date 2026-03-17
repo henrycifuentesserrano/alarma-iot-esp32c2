@@ -1,125 +1,170 @@
-| Supported Targets | ESP32 | ESP32-C2 | ESP32-C3 | ESP32-C5 | ESP32-C6 | ESP32-C61 | ESP32-S2 | ESP32-S3 | ESP32-P4 | ESP32-H2 |
-| ----------------- | ----- | -------- | -------- | -------- | --------- | -------- | -------- | -------- | -------- | -------- |
+# Control de Relé con ESP32-C2 y Blynk via MQTT
 
-# Wi-Fi Station Example
+Proyecto IoT para controlar un relé desde cualquier lugar usando la app Blynk.
+Desarrollado sobre ESP-IDF 5.5 sin Arduino.
 
-(See the README.md file in the upper level 'examples' directory for more information about examples.)
+---
 
-This example shows how to use the Wi-Fi Station functionality of the Wi-Fi driver of ESP for connecting to an Access Point.
+## Hardware usado
 
-## How to use example
+- ESPC2-12 DevKit CozyLife (ESP32-C2, cristal 26MHz, flash 2MB)
+- Relé 5V DC / 10A 120-220VAC (5 pines)
+- PC817 optoacoplador
+- Transistor 2N2222
+- Diodo 1N4007
+- 2x LED (estado relé y conexión WiFi/Blynk)
+- 1x Resistencia 200Ω
+- 3x Resistencia 1kΩ
 
-### Configure the project
+---
 
-Open the project configuration menu (`idf.py menuconfig`).
+## Esquema de conexión
 
-In the `Example Configuration` menu:
-
-* Set the Wi-Fi configuration.
-    * Set `WiFi SSID`.
-    * Set `WiFi Password`.
-
-Optional: If you need, change the other options according to your requirements.
-
-### Build and Flash
-
-Build the project and flash it to the board, then run the monitor tool to view the serial output:
-
-Run `idf.py -p PORT flash monitor` to build, flash and monitor the project.
-
-(To exit the serial monitor, type ``Ctrl-]``.)
-
-See the Getting Started Guide for all the steps to configure and use the ESP-IDF to build projects.
-
-* [ESP-IDF Getting Started Guide on ESP32](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html)
-* [ESP-IDF Getting Started Guide on ESP32-S2](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s2/get-started/index.html)
-* [ESP-IDF Getting Started Guide on ESP32-C3](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/get-started/index.html)
-
-## Example Output
-Note that the output, in particular the order of the output, may vary depending on the environment.
-
-Console output if station connects to AP successfully:
+### ESP32-C2 → PC817 (aislamiento)
 ```
-I (589) wifi station: ESP_WIFI_MODE_STA
-I (599) wifi: wifi driver task: 3ffc08b4, prio:23, stack:3584, core=0
-I (599) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (599) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (629) wifi: wifi firmware version: 2d94f02
-I (629) wifi: config NVS flash: enabled
-I (629) wifi: config nano formatting: disabled
-I (629) wifi: Init dynamic tx buffer num: 32
-I (629) wifi: Init data frame dynamic rx buffer num: 32
-I (639) wifi: Init management frame dynamic rx buffer num: 32
-I (639) wifi: Init management short buffer num: 32
-I (649) wifi: Init static rx buffer size: 1600
-I (649) wifi: Init static rx buffer num: 10
-I (659) wifi: Init dynamic rx buffer num: 32
-I (759) phy: phy_version: 4180, cb3948e, Sep 12 2019, 16:39:13, 0, 0
-I (769) wifi: mode : sta (30:ae:a4:d9:bc:c4)
-I (769) wifi station: wifi_init_sta finished.
-I (889) wifi: new:<6,0>, old:<1,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (889) wifi: state: init -> auth (b0)
-I (899) wifi: state: auth -> assoc (0)
-I (909) wifi: state: assoc -> run (10)
-I (939) wifi: connected with #!/bin/test, aid = 1, channel 6, BW20, bssid = ac:9e:17:7e:31:40
-I (939) wifi: security type: 3, phy: bgn, rssi: -68
-I (949) wifi: pm start, type: 1
-
-I (1029) wifi: AP's beacon interval = 102400 us, DTIM period = 3
-I (2089) esp_netif_handlers: sta ip: 192.168.77.89, mask: 255.255.255.0, gw: 192.168.77.1
-I (2089) wifi station: got ip:192.168.77.89
-I (2089) wifi station: connected to ap SSID:myssid password:mypassword
+GPIO5 → R200Ω → Pin 1 PC817 (ánodo)
+GND   →         Pin 2 PC817 (cátodo)
 ```
 
-Console output if the station failed to connect to AP:
+### PC817 → 2N2222 (amplificación)
 ```
-I (589) wifi station: ESP_WIFI_MODE_STA
-I (599) wifi: wifi driver task: 3ffc08b4, prio:23, stack:3584, core=0
-I (599) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (599) system_api: Base MAC address is not set, read default base MAC address from BLK0 of EFUSE
-I (629) wifi: wifi firmware version: 2d94f02
-I (629) wifi: config NVS flash: enabled
-I (629) wifi: config nano formatting: disabled
-I (629) wifi: Init dynamic tx buffer num: 32
-I (629) wifi: Init data frame dynamic rx buffer num: 32
-I (639) wifi: Init management frame dynamic rx buffer num: 32
-I (639) wifi: Init management short buffer num: 32
-I (649) wifi: Init static rx buffer size: 1600
-I (649) wifi: Init static rx buffer num: 10
-I (659) wifi: Init dynamic rx buffer num: 32
-I (759) phy: phy_version: 4180, cb3948e, Sep 12 2019, 16:39:13, 0, 0
-I (759) wifi: mode : sta (30:ae:a4:d9:bc:c4)
-I (769) wifi station: wifi_init_sta finished.
-I (889) wifi: new:<6,0>, old:<1,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (889) wifi: state: init -> auth (b0)
-I (1889) wifi: state: auth -> init (200)
-I (1889) wifi: new:<6,0>, old:<6,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (1889) wifi station: retry to connect to the AP
-I (1899) wifi station: connect to the AP fail
-I (3949) wifi station: retry to connect to the AP
-I (3949) wifi station: connect to the AP fail
-I (4069) wifi: new:<6,0>, old:<6,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (4069) wifi: state: init -> auth (b0)
-I (5069) wifi: state: auth -> init (200)
-I (5069) wifi: new:<6,0>, old:<6,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (5069) wifi station: retry to connect to the AP
-I (5069) wifi station: connect to the AP fail
-I (7129) wifi station: retry to connect to the AP
-I (7129) wifi station: connect to the AP fail
-I (7249) wifi: new:<6,0>, old:<6,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (7249) wifi: state: init -> auth (b0)
-I (8249) wifi: state: auth -> init (200)
-I (8249) wifi: new:<6,0>, old:<6,0>, ap:<255,255>, sta:<6,0>, prof:1
-I (8249) wifi station: retry to connect to the AP
-I (8249) wifi station: connect to the AP fail
-I (10299) wifi station: connect to the AP fail
-I (10299) wifi station: Failed to connect to SSID:myssid, password:mypassword
+Pin 3 PC817 (emisor)   → GND
+Pin 4 PC817 (colector) → R1kΩ → 5V   (pull-up)
+Pin 4 PC817 (colector) → Base 2N2222  (mismo punto)
 ```
 
-## Running the example on ESP Chips without Wi-Fi
+### 2N2222 → Relé
+```
+Emisor 2N2222   → GND
+Colector 2N2222 → Pin IN del relé
+```
 
-This example can run on ESP Chips without Wi-Fi using ESP-Hosted. See the [Two-Chip Solution](../../README.md#wi-fi-examples-with-two-chip-solution) section in the upper level `README.md` for information.
+### Relé
+```
+VCC → 5V
+GND → GND
+IN  → Colector 2N2222
+COM → cable común de la carga
+NO  → otro cable de la carga
+```
 
-## Troubleshooting
+### Diodo 1N4007 (protección bobina)
+```
+Cátodo (banda) → VCC relé (5V)
+Ánodo          → GND relé
+```
 
-For any technical queries, please open an [issue](https://github.com/espressif/esp-idf/issues) on GitHub. We will get back to you soon.
+### LEDs
+```
+GPIO10 → R1kΩ → LED estado relé → GND
+GPIO18 → R1kΩ → LED conexión WiFi/Blynk → GND
+```
+
+### GND común
+```
+GND ESP32 + Pin2 PC817 + Pin3 PC817 + Emisor 2N2222 + GND relé
+```
+
+---
+
+## Configuración del entorno
+
+### Requisitos
+- Windows 10/11
+- ESP-IDF 5.5.3 instalado (incluye Python 3.11 y Git)
+- Cuenta en Blynk (plan gratuito funciona)
+
+### Instalación ESP-IDF
+Descarga el instalador oficial desde:
+https://dl.espressif.com/dl/esp-idf/
+
+Durante la instalación se crea acceso directo a **ESP-IDF 5.5 PowerShell** en el menú inicio. Usar siempre ese entorno para compilar y flashear.
+
+---
+
+## Configuración del proyecto
+
+### 1. Clonar el repositorio
+```powershell
+git clone https://github.com/henrycifuentesserrano/blynk-rele-esp32c2.git
+cd blynk-rele-esp32c2
+```
+
+### 2. Configurar el target
+El ESPC2-12 de CozyLife usa cristal de 26MHz. Esto es crítico — sin este paso el WiFi no funciona.
+```powershell
+idf.py set-target esp32c2
+idf.py menuconfig
+```
+
+Dentro del menuconfig:
+- **Component config → Hardware Settings → Main XTAL frequency → 26 MHz**
+- **Blynk Rele Configuration → WiFi SSID** → nombre de tu red 2.4GHz
+- **Blynk Rele Configuration → WiFi Password** → contraseña
+- **Blynk Rele Configuration → Blynk Auth Token** → token de tu dispositivo Blynk
+- **Blynk Rele Configuration → Blynk Template ID** → ID de tu plantilla Blynk
+
+Guardar con `S`, salir con `Q`.
+
+### 3. Compilar y flashear
+Identificar el puerto COM en el Administrador de dispositivos (Puertos COM y LPT).
+```powershell
+idf.py build flash monitor -p COM5 --monitor-baud 74880
+```
+
+El `74880` es la velocidad correcta para el cristal de 26MHz del ESPC2-12.
+
+---
+
+## Configuración en Blynk
+
+1. Crear cuenta en https://blynk.io
+2. Crear nuevo template con nombre "Alarma"
+3. Agregar datastream: Virtual Pin V0, nombre "Rele", tipo Integer, min 0, max 1
+4. Crear dashboard con un widget Button, asociarlo al datastream "Rele", modo Switch
+5. Crear dispositivo desde el template y copiar el Auth Token
+
+---
+
+## Funcionamiento
+
+| Evento | LED GPIO10 | LED GPIO18 | Relé |
+|--------|-----------|-----------|------|
+| Arranca | OFF | OFF | OFF |
+| Conectado a WiFi/Blynk | OFF | ON | OFF |
+| Botón ON en app | ON | ON | ON |
+| Botón OFF en app | OFF | ON | OFF |
+| Sin conexión | OFF | OFF | último estado |
+
+---
+
+## Notas importantes
+
+- La red WiFi debe ser **2.4GHz**. El ESP32-C2 no soporta 5GHz.
+- El cristal de **26MHz** es específico del ESPC2-12 CozyLife. Otros módulos ESP32-C2 pueden usar 40MHz.
+- El relé siempre **inicia en OFF** al encender el dispositivo.
+- Las credenciales WiFi y Blynk se configuran via `menuconfig` y no se suben al repositorio.
+- El PC817 aísla eléctricamente el ESP32 del circuito del relé, protegiendo el microcontrolador.
+
+---
+
+## Estructura del proyecto
+```
+blynk-rele-esp32c2/
+├── main/
+│   ├── blynk_rele_main.c     # código principal
+│   ├── CMakeLists.txt
+│   ├── Kconfig.projbuild     # menú de configuración
+│   └── idf_component.yml
+├── CMakeLists.txt
+├── README.md
+├── sdkconfig.defaults
+└── .gitignore
+```
+
+---
+
+## Autor
+
+Henry Cifuentes Serrano  
+[github.com/henrycifuentesserrano](https://github.com/henrycifuentesserrano)
