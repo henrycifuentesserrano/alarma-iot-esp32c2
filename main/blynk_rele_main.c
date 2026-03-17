@@ -12,11 +12,11 @@
 #include "mqtt_client.h"
 #include "esp_crt_bundle.h"
 
-#define WIFI_SSID      "Office_MET"
-#define WIFI_PASS      "13092825"
-#define BLYNK_AUTH     "oN-_K8ICQRIPoPnQRK9A_VQC-tZ_OD4i"
+#define WIFI_SSID      CONFIG_WIFI_SSID
+#define WIFI_PASS      CONFIG_WIFI_PASSWORD
+#define BLYNK_AUTH     CONFIG_BLYNK_AUTH_TOKEN
 #define PIN_RELE       GPIO_NUM_5
-#define BLYNK_TEMPLATE_ID  "TMPL2JRXZew9V"
+#define BLYNK_TEMPLATE_ID  CONFIG_BLYNK_TEMPLATE_ID
 
 static const char *TAG = "blynk-rele";
 static EventGroupHandle_t wifi_event_group;
