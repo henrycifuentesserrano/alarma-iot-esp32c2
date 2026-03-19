@@ -152,7 +152,7 @@ static void set_rele(int state)
     ESP_LOGI(TAG, "Rele %s", state ? "ON" : "OFF");
     if (mqtt_client) {
         char payload[32];
-        snprintf(payload, sizeof(payload), "{\"rele\":%d}", state);
+	snprintf(payload, sizeof(payload), "{\"rele\":%d}", state);
         esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload, 0, 1, 0);
     }
 }
@@ -179,44 +179,74 @@ static void tarea_boton(void *pvParameters)
 }
 
 // Página web de provisioning
+
 static const char *html_form =
     "<!DOCTYPE html><html><head>"
     "<meta charset='UTF-8'>"
     "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-    "<title>Configurar Alarma</title>"
+    "<title>YUMA Connect - Configuracion</title>"
     "<style>"
-    "body{font-family:sans-serif;max-width:400px;margin:40px auto;padding:20px;background:#f0f0f0;}"
-    "h2{color:#333;text-align:center;}"
-    "input{width:100%;padding:10px;margin:8px 0;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;}"
-    "button{width:100%;padding:12px;background:#007bff;color:white;border:none;border-radius:6px;font-size:16px;cursor:pointer;}"
-    "button:hover{background:#0056b3;}"
-    ".label{font-weight:bold;color:#555;margin-top:10px;display:block;}"
+    "*{box-sizing:border-box;margin:0;padding:0;}"
+    "body{font-family:sans-serif;min-height:100vh;background:#0a2342;display:flex;align-items:center;justify-content:center;padding:20px;}"
+    ".card{background:#1a4a8a;border-radius:16px;padding:30px;width:100%;max-width:380px;}"
+    ".logo{text-align:center;margin-bottom:24px;}"
+    ".logo h1{color:#2ecc71;font-size:32px;font-weight:bold;letter-spacing:2px;}"
+    ".logo .isf{color:#ffffff;font-size:12px;margin-top:4px;}"
+    ".logo .subtitle{color:#ffffff;font-size:15px;margin-top:12px;font-weight:bold;}"
+    ".divider{border:none;border-top:1px solid #0a2342;margin:12px 0;}"
+    "label{display:block;color:#ffffff;font-size:15px;font-weight:bold;margin-bottom:6px;margin-top:14px;}"
+    "input{width:100%;padding:12px;border:none;border-radius:8px;background:#0a2342;color:#fff;font-size:15px;}"
+    "input::placeholder{color:#7f8c8d;}"
+    ".btn{width:100%;padding:14px;margin-top:24px;background:#2ecc71;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;}"
+    ".btn:hover{background:#27ae60;}"
     "</style></head><body>"
-    "<h2>Configurar Alarma</h2>"
+    "<div class='card'>"
+    "<div class='logo'>"
+    "<h1>YUMA</h1>"
+    "<p class='isf'>Intelligent Systems Flow</p>"
+    "<hr class='divider'>"
+    "<p class='subtitle'>Configuracion del dispositivo</p>"
+    "</div>"
     "<form action='/save' method='POST'>"
-    "<span class='label'>Red WiFi</span>"
+    "<label>Red WiFi</label>"
     "<input name='ssid' placeholder='Nombre de la red WiFi' required>"
-    "<span class='label'>Contraseña WiFi</span>"
-    "<input name='pass' type='password' placeholder='Contraseña' required>"
-    "<span class='label'>Latitud</span>"
+    "<label>Contrasena WiFi</label>"
+    "<input name='pass' type='password' placeholder='Contrasena' required>"
+    "<label>Latitud</label>"
     "<input name='lat' placeholder='Ej: 4.1234' required>"
-    "<span class='label'>Longitud</span>"
+    "<label>Longitud</label>"
     "<input name='lon' placeholder='Ej: -74.1234' required>"
-    "<br><br>"
-    "<button type='submit'>Guardar y Conectar</button>"
-    "</form></body></html>";
+    "<button class='btn' type='submit'>Guardar y Conectar</button>"
+    "</form>"
+    "</div></body></html>";
 
 static const char *html_ok =
     "<!DOCTYPE html><html><head>"
     "<meta charset='UTF-8'>"
     "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-    "<title>Listo</title>"
-    "<style>body{font-family:sans-serif;text-align:center;padding:40px;background:#f0f0f0;}"
-    "h2{color:#28a745;}p{color:#555;}</style></head><body>"
-    "<h2>✓ Configuración guardada</h2>"
-    "<p>El dispositivo se está conectando a la red WiFi.</p>"
-    "<p>Puedes cerrar esta página.</p>"
-    "</body></html>";
+    "<title>YUMA Connect</title>"
+    "<style>"
+    "*{box-sizing:border-box;margin:0;padding:0;}"
+    "body{font-family:sans-serif;min-height:100vh;background:#0a2342;display:flex;align-items:center;justify-content:center;padding:20px;}"
+    ".card{background:#1a4a8a;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}"
+    ".logo h1{color:#2ecc71;font-size:32px;font-weight:bold;letter-spacing:2px;}"
+    ".logo .isf{color:#ffffff;font-size:12px;margin-top:4px;margin-bottom:24px;}"
+    ".divider{border:none;border-top:1px solid #0a2342;margin:12px 0;}"
+    ".check{color:#2ecc71;font-size:48px;margin:16px 0;}"
+    "h2{color:#2ecc71;font-size:20px;margin-bottom:12px;}"
+    "p{color:#ffffff;font-size:15px;line-height:1.6;}"
+    "</style></head><body>"
+    "<div class='card'>"
+    "<div class='logo'>"
+    "<h1>YUMA</h1>"
+    "<p class='isf'>Intelligent Systems Flow</p>"
+    "<hr class='divider'>"
+    "</div>"
+    "<div class='check'>&#10003;</div>"
+    "<h2>Configuracion guardada</h2>"
+    "<p>El dispositivo se esta conectando a la red WiFi.</p>"
+    "<p>Puedes cerrar esta pagina.</p>"
+    "</div></body></html>";
 
 static esp_err_t handler_root(httpd_req_t *req)
 {
@@ -340,11 +370,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 
     switch (event_id) {
         case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG, "Conectado a AWS IoT Core!");
-            estado_actual = ESTADO_OPERANDO;
-            esp_mqtt_client_subscribe(mqtt_client, TOPIC_CONTROL, 1);
-            esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, "{\"rele\":0}", 0, 1, 0);
-            break;
+    	    ESP_LOGI(TAG, "Conectado a AWS IoT Core!");
+    	    estado_actual = ESTADO_OPERANDO;
+    	    esp_mqtt_client_subscribe(mqtt_client, TOPIC_CONTROL, 1);
+    	    esp_mqtt_client_publish(mqtt_client, "finca/rele/conexion", "{\"c\":1}", 7, 1, 0);
+    	    char payload_init[128];
+    	    snprintf(payload_init, sizeof(payload_init), "{\"rele\":0,\"lat\":\"%s\",\"lon\":\"%s\"}", device_lat, device_lon);
+    	    esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload_init, 0, 1, 0);
+    	    break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGW(TAG, "Desconectado de AWS IoT");
             estado_actual = ESTADO_RECONECTANDO;
@@ -360,11 +393,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
             }
             break;
         case MQTT_EVENT_ERROR:
-            ESP_LOGE(TAG, "Error MQTT");
-            estado_actual = ESTADO_RECONECTANDO;
-            break;
-        default:
-            break;
+    	   ESP_LOGE(TAG, "Error MQTT tipo: %d", event->error_handle->error_type);
+    	   ESP_LOGE(TAG, "Error ESP-TLS: %d", event->error_handle->esp_tls_last_esp_err);
+    	   ESP_LOGE(TAG, "Error TLS stack: %d", event->error_handle->esp_tls_stack_err);
+    	   estado_actual = ESTADO_RECONECTANDO;
+    	   break;
     }
 }
 
@@ -387,8 +420,17 @@ static void mqtt_init(void)
                 .key_len = private_pem_key_end - private_pem_key_start,
             },
         },
+        .session = {
+	    .keepalive = 30,
+            .last_will = {
+                .topic = "finca/rele/conexion",
+                .msg = "{\"c\":0}",
+                .msg_len = 7,
+                .qos = 1,
+                .retain = 0,
+            },
+        },
     };
-
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(mqtt_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(mqtt_client);
