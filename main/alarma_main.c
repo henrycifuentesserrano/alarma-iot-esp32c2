@@ -32,6 +32,10 @@
 #define NVS_KEY_LAT       "latitude"
 #define NVS_KEY_LON       "longitude"
 
+#define TOPIC_SHADOW_UPDATE  "$aws/things/" AWS_THING_NAME "/shadow/update"
+#define TOPIC_SHADOW_GET     "$aws/things/" AWS_THING_NAME "/shadow/get"
+#define TOPIC_SHADOW_GET_ACC "$aws/things/" AWS_THING_NAME "/shadow/get/accepted"
+
 static const char *TAG = "aws-rele";
 
 extern const uint8_t certificate_pem_crt_start[] asm("_binary_certificate_pem_crt_start");
@@ -75,9 +79,9 @@ static void tarea_led(void *pvParameters)
                 break;
             case ESTADO_CONECTANDO_AWS:
                 gpio_set_level(LED_WIFI, 1);
-                vTaskDelay(pdMS_TO_TICKS(250));
+                vTaskDelay(pdMS_TO_TICKS(1000));
                 gpio_set_level(LED_WIFI, 0);
-                vTaskDelay(pdMS_TO_TICKS(250));
+                vTaskDelay(pdMS_TO_TICKS(1000));
                 break;
             case ESTADO_OPERANDO:
                 gpio_set_level(LED_WIFI, 1);
@@ -85,9 +89,9 @@ static void tarea_led(void *pvParameters)
                 break;
             case ESTADO_RECONECTANDO:
                 gpio_set_level(LED_WIFI, 1);
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                vTaskDelay(pdMS_TO_TICKS(2000));
                 gpio_set_level(LED_WIFI, 0);
-                vTaskDelay(pdMS_TO_TICKS(1000));
+                vTaskDelay(pdMS_TO_TICKS(2000));
                 break;
             case ESTADO_PROVISIONING:
                 gpio_set_level(LED_WIFI, 1);
@@ -97,7 +101,7 @@ static void tarea_led(void *pvParameters)
                 gpio_set_level(LED_WIFI, 1);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 gpio_set_level(LED_WIFI, 0);
-                vTaskDelay(pdMS_TO_TICKS(700));
+                vTaskDelay(pdMS_TO_TICKS(500));
                 break;
         }
     }
@@ -153,7 +157,12 @@ static void set_rele(int state)
     if (mqtt_client) {
         char payload[32];
 	snprintf(payload, sizeof(payload), "{\"rele\":%d}", state);
-        esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload, 0, 1, 0);
+	esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload, 0, 1, 0);
+
+	// Actualizar Shadow
+	char shadow[64];
+	snprintf(shadow, sizeof(shadow), "{\"state\":{\"reported\":{\"rele\":%d}}}", state);
+	esp_mqtt_client_publish(mqtt_client, TOPIC_SHADOW_UPDATE, shadow, 0, 1, 0);
     }
 }
 
@@ -184,28 +193,31 @@ static const char *html_form =
     "<!DOCTYPE html><html><head>"
     "<meta charset='UTF-8'>"
     "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-    "<title>YUMA Connect - Configuracion</title>"
+    "<title>YUMA IoT - Configuracion</title>"
     "<style>"
     "*{box-sizing:border-box;margin:0;padding:0;}"
     "body{font-family:sans-serif;min-height:100vh;background:#0a2342;display:flex;align-items:center;justify-content:center;padding:20px;}"
-    ".card{background:#1a4a8a;border-radius:16px;padding:30px;width:100%;max-width:380px;}"
-    ".logo{text-align:center;margin-bottom:24px;}"
-    ".logo h1{color:#2ecc71;font-size:32px;font-weight:bold;letter-spacing:2px;}"
-    ".logo .isf{color:#ffffff;font-size:12px;margin-top:4px;}"
-    ".logo .subtitle{color:#ffffff;font-size:15px;margin-top:12px;font-weight:bold;}"
+    ".card{background:#1a4a8a;border-radius:16px;padding:24px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,0.3);}"
+    ".logo{text-align:center;margin-bottom:20px;}"
+    ".logo h1{color:#2ecc71;font-size:32px;font-weight:bold;letter-spacing:2px;line-height:1;}"
+    ".logo .iot{color:#ffffff;font-size:26px;font-weight:bold;line-height:1;}"
+    ".logo .isf{color:#ffffff;font-size:11px;letter-spacing:1px;margin-top:4px;}"
     ".divider{border:none;border-top:1px solid #0a2342;margin:12px 0;}"
+    ".subtitle{color:#ffffff;font-size:15px;font-weight:bold;text-align:center;margin-bottom:8px;}"
     "label{display:block;color:#ffffff;font-size:15px;font-weight:bold;margin-bottom:6px;margin-top:14px;}"
-    "input{width:100%;padding:12px;border:none;border-radius:8px;background:#0a2342;color:#fff;font-size:15px;}"
-    "input::placeholder{color:#7f8c8d;}"
-    ".btn{width:100%;padding:14px;margin-top:24px;background:#2ecc71;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;}"
+    "input{width:100%;padding:10px;border:none;border-radius:8px;background:#0a2342;color:#fff;font-size:15px;margin-bottom:0;}"
+    "input::placeholder{color:#b0bec5;}"
+    ".btn{width:100%;padding:12px;margin-top:24px;background:#2ecc71;color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;}"
     ".btn:hover{background:#27ae60;}"
+    ".copyright{text-align:center;margin-top:20px;font-size:11px;color:#ffffff;}"
     "</style></head><body>"
     "<div class='card'>"
     "<div class='logo'>"
     "<h1>YUMA</h1>"
-    "<p class='isf'>Intelligent Systems Flow</p>"
+    "<div class='iot'>IoT</div>"
+    "<div class='isf'>INTELLIGENT SYSTEMS FLOW</div>"
     "<hr class='divider'>"
-    "<p class='subtitle'>Configuracion del dispositivo</p>"
+    "<div class='subtitle'>Configuracion del dispositivo</div>"
     "</div>"
     "<form action='/save' method='POST'>"
     "<label>Red WiFi</label>"
@@ -218,34 +230,39 @@ static const char *html_form =
     "<input name='lon' placeholder='Ej: -74.1234' required>"
     "<button class='btn' type='submit'>Guardar y Conectar</button>"
     "</form>"
+    "<div class='copyright'>&#169; 2026 YUMA-TECH &#8212; All rights reserved</div>"
     "</div></body></html>";
 
 static const char *html_ok =
     "<!DOCTYPE html><html><head>"
     "<meta charset='UTF-8'>"
     "<meta name='viewport' content='width=device-width, initial-scale=1'>"
-    "<title>YUMA Connect</title>"
+    "<title>YUMA IoT</title>"
     "<style>"
     "*{box-sizing:border-box;margin:0;padding:0;}"
     "body{font-family:sans-serif;min-height:100vh;background:#0a2342;display:flex;align-items:center;justify-content:center;padding:20px;}"
-    ".card{background:#1a4a8a;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}"
-    ".logo h1{color:#2ecc71;font-size:32px;font-weight:bold;letter-spacing:2px;}"
-    ".logo .isf{color:#ffffff;font-size:12px;margin-top:4px;margin-bottom:24px;}"
+    ".card{background:#1a4a8a;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.3);}"
+    ".logo h1{color:#2ecc71;font-size:32px;font-weight:bold;letter-spacing:2px;line-height:1;}"
+    ".logo .iot{color:#ffffff;font-size:26px;font-weight:bold;line-height:1;}"
+    ".logo .isf{color:#ffffff;font-size:11px;letter-spacing:1px;margin-top:4px;}"
     ".divider{border:none;border-top:1px solid #0a2342;margin:12px 0;}"
     ".check{color:#2ecc71;font-size:48px;margin:16px 0;}"
     "h2{color:#2ecc71;font-size:20px;margin-bottom:12px;}"
-    "p{color:#ffffff;font-size:15px;line-height:1.6;}"
+    "p{color:#ffffff;font-size:15px;line-height:1.6;margin-top:8px;}"
+    ".copyright{text-align:center;margin-top:20px;font-size:11px;color:#ffffff;}"
     "</style></head><body>"
     "<div class='card'>"
     "<div class='logo'>"
     "<h1>YUMA</h1>"
-    "<p class='isf'>Intelligent Systems Flow</p>"
+    "<div class='iot'>IoT</div>"
+    "<div class='isf'>INTELLIGENT SYSTEMS FLOW</div>"
     "<hr class='divider'>"
     "</div>"
     "<div class='check'>&#10003;</div>"
     "<h2>Configuracion guardada</h2>"
     "<p>El dispositivo se esta conectando a la red WiFi.</p>"
     "<p>Puedes cerrar esta pagina.</p>"
+    "<div class='copyright'>&#169; 2026 YUMA-TECH &#8212; All rights reserved</div>"
     "</div></body></html>";
 
 static esp_err_t handler_root(httpd_req_t *req)
@@ -318,29 +335,20 @@ static void iniciar_modo_ap(void)
 static void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
-    static int retry_count = 0;
-
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        retry_count++;
-        ESP_LOGW(TAG, "WiFi desconectado, intento %d", retry_count);
+        ESP_LOGW(TAG, "WiFi desconectado, reintentando...");
         estado_actual = ESTADO_RECONECTANDO;
-        if (retry_count >= 3) {
-            ESP_LOGE(TAG, "3 intentos fallidos, volviendo a provisioning");
-            nvs_clear_wifi();
-            esp_restart();
-        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
         esp_wifi_connect();
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        retry_count = 0;
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "IP: " IPSTR, IP2STR(&event->ip_info.ip));
         estado_actual = ESTADO_CONECTANDO_AWS;
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
-
 static void wifi_init_sta(void)
 {
     wifi_event_group = xEventGroupCreate();
@@ -373,10 +381,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
     	    ESP_LOGI(TAG, "Conectado a AWS IoT Core!");
     	    estado_actual = ESTADO_OPERANDO;
     	    esp_mqtt_client_subscribe(mqtt_client, TOPIC_CONTROL, 1);
+    	    esp_mqtt_client_subscribe(mqtt_client, TOPIC_SHADOW_GET_ACC, 1);
+    
+    	    // Actualizar Shadow con estado completo
+    	    char shadow_payload[256];
+    	    snprintf(shadow_payload, sizeof(shadow_payload),
+        	"{\"state\":{\"reported\":{\"connected\":true,\"rele\":0,\"lat\":\"%s\",\"lon\":\"%s\"}}}",
+        	device_lat, device_lon);
+    	    esp_mqtt_client_publish(mqtt_client, TOPIC_SHADOW_UPDATE, shadow_payload, 0, 1, 0);
+    
+    	    // Publicar en topic de conexion (mantener compatibilidad)
     	    esp_mqtt_client_publish(mqtt_client, "finca/rele/conexion", "{\"c\":1}", 7, 1, 0);
-    	    char payload_init[128];
-    	    snprintf(payload_init, sizeof(payload_init), "{\"rele\":0,\"lat\":\"%s\",\"lon\":\"%s\"}", device_lat, device_lon);
-    	    esp_mqtt_client_publish(mqtt_client, TOPIC_STATUS, payload_init, 0, 1, 0);
     	    break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGW(TAG, "Desconectado de AWS IoT");
@@ -423,12 +438,12 @@ static void mqtt_init(void)
         .session = {
 	    .keepalive = 30,
             .last_will = {
-                .topic = "finca/rele/conexion",
-                .msg = "{\"c\":0}",
-                .msg_len = 7,
-                .qos = 1,
-                .retain = 0,
-            },
+    		.topic = "finca/rele/conexion",
+    		.msg = "{\"c\":0}",
+    		.msg_len = 7,
+    		.qos = 1,
+    		.retain = 0,
+	    },
         },
     };
     mqtt_client = esp_mqtt_client_init(&mqtt_cfg);
