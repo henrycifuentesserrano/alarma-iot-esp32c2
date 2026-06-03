@@ -482,9 +482,9 @@ static void mqtt_init(void)
         .session = {
 	    .keepalive = 30,
             .last_will = {
-    		.topic = TOPIC_SHADOW_UPDATE,
-    		.msg = "{\"state\":{\"reported\":{\"connected\":false}}}",
-    		.msg_len = 42,
+    		.topic = "finca/rele/conexion",
+    		.msg = "{\"c\":0}",
+    		.msg_len = 7,
     		.qos = 1,
     		.retain = 0,
 	    },
