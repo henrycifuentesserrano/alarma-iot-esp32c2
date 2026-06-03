@@ -25,6 +25,8 @@
 #define LED_RELE          GPIO_NUM_10
 #define LED_WIFI          GPIO_NUM_18
 #define BTN_RESET         GPIO_NUM_9
+#define BTN_TOGGLE        GPIO_NUM_7
+#define BTN_TOGGLE2       GPIO_NUM_6
 
 #define NVS_NAMESPACE     "wifi_config"
 #define NVS_KEY_SSID      "ssid"
@@ -60,6 +62,7 @@ static EventGroupHandle_t wifi_event_group;
 
 static esp_mqtt_client_handle_t mqtt_client = NULL;
 static httpd_handle_t server = NULL;
+static bool estado_rele = false;
 static char wifi_ssid[64] = {0};
 static char wifi_pass[64] = {0};
 static char device_lat[20] = {0};
@@ -151,6 +154,7 @@ static void nvs_clear_wifi(void)
 // Relé
 static void set_rele(int state)
 {
+    estado_rele = (state == 1);
     gpio_set_level(PIN_RELE, state);
     gpio_set_level(LED_RELE, state);
     ESP_LOGI(TAG, "Rele %s", state ? "ON" : "OFF");
@@ -184,6 +188,46 @@ static void tarea_boton(void *pvParameters)
             contador = 0;
         }
         vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
+
+static void tarea_toggle(void *pvParameters)
+{
+    bool ultimo = true;
+    while (1) {
+        bool lectura = (gpio_get_level(BTN_TOGGLE) == 1);
+        if (!lectura && ultimo) {
+            set_rele(estado_rele ? 0 : 1);
+        }
+        ultimo = lectura;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+static void tarea_toggle2(void *pvParameters)
+{
+    bool ultimo = true;
+    while (1) {
+        bool lectura = (gpio_get_level(BTN_TOGGLE2) == 1);
+        if (!lectura && ultimo) {
+            set_rele(estado_rele ? 0 : 1);
+        }
+        ultimo = lectura;
+        vTaskDelay(pdMS_TO_TICKS(50));
+    }
+}
+
+static void tarea_heartbeat(void *pvParameters)
+{
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(60000));
+        if (mqtt_client && estado_actual == ESTADO_OPERANDO) {
+            char shadow[64];
+            snprintf(shadow, sizeof(shadow),
+                "{\"state\":{\"reported\":{\"connected\":true}}}");
+            esp_mqtt_client_publish(mqtt_client, TOPIC_SHADOW_UPDATE, shadow, 0, 1, 0);
+            ESP_LOGI(TAG, "Heartbeat enviado");
+        }
     }
 }
 
@@ -438,9 +482,9 @@ static void mqtt_init(void)
         .session = {
 	    .keepalive = 30,
             .last_will = {
-    		.topic = "finca/rele/conexion",
-    		.msg = "{\"c\":0}",
-    		.msg_len = 7,
+    		.topic = TOPIC_SHADOW_UPDATE,
+    		.msg = "{\"state\":{\"reported\":{\"connected\":false}}}",
+    		.msg_len = 42,
     		.qos = 1,
     		.retain = 0,
 	    },
@@ -480,8 +524,30 @@ void app_main(void)
     };
     gpio_config(&btn_conf);
 
+    gpio_config_t btn_toggle_conf = {
+        .pin_bit_mask = (1ULL << BTN_TOGGLE),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&btn_toggle_conf);
+
+    gpio_config_t btn_toggle2_conf = {
+        .pin_bit_mask = (1ULL << BTN_TOGGLE2),
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&btn_toggle2_conf);
+    
+
     xTaskCreate(tarea_led, "tarea_led", 2048, NULL, 5, NULL);
     xTaskCreate(tarea_boton, "tarea_boton", 2048, NULL, 4, NULL);
+    xTaskCreate(tarea_toggle, "tarea_toggle", 2048, NULL, 6, NULL);
+    xTaskCreate(tarea_toggle2, "tarea_toggle2", 2048, NULL, 6, NULL);
+    xTaskCreate(tarea_heartbeat, "tarea_heartbeat", 2048, NULL, 3, NULL);
 
     estado_actual = ESTADO_INICIANDO;
 
