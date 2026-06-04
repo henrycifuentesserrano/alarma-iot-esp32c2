@@ -424,6 +424,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
         case MQTT_EVENT_CONNECTED:
     	    ESP_LOGI(TAG, "Conectado a AWS IoT Core!");
     	    estado_actual = ESTADO_OPERANDO;
+	    set_rele(0);
     	    esp_mqtt_client_subscribe(mqtt_client, TOPIC_CONTROL, 1);
     	    esp_mqtt_client_subscribe(mqtt_client, TOPIC_SHADOW_GET_ACC, 1);
     
